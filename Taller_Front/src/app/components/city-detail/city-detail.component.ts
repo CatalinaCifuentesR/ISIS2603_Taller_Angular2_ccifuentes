@@ -1,14 +1,19 @@
-import { Component, Input, OnChanges, SimpleChanges, inject } from '@angular/core';
+import {
+  Component,
+  Input,
+  OnChanges,
+  SimpleChanges,
+  inject
+} from '@angular/core';
+
 import { CommonModule } from '@angular/common';
+
 import { City } from '../../models/city.model';
 import { WeatherRecord } from '../../models/weather-record.model';
-import { WeatherRecordService } from '../../services/weather-record.service';
+import { WeatherDetail } from '../../models/weather.model';
 
-/*
- * Implementar:
- * HU-03 — Detalle de Ciudad con Clima (Ver TALLER.md Parte B)
- * HU-04 — Historial de Registros de Clima (Ver TALLER.md Parte D)
- */
+import { WeatherRecordService } from '../../services/weather-record.service';
+import { WeatherService } from '../../services/weather.service';
 
 @Component({
   selector: 'app-city-detail',
@@ -17,23 +22,67 @@ import { WeatherRecordService } from '../../services/weather-record.service';
   templateUrl: './city-detail.component.html'
 })
 export class CityDetailComponent implements OnChanges {
+
   private weatherRecordService = inject(WeatherRecordService);
+  private weatherService = inject(WeatherService);
 
   @Input() city!: City;
 
   weatherRecords: WeatherRecord[] = [];
 
-  ngOnChanges(changes: SimpleChanges): void {
-    if (changes['city'] && this.city) {
-      this.weatherRecordService.getRecords(this.city.id)
-        .subscribe(records => this.weatherRecords = records);
+  weatherDetail: WeatherDetail | null = null;
 
-      // TODO HU-03: Agregar aquí el obtener el clima de la ciudad
+  loading = false;
+
+  ngOnChanges(changes: SimpleChanges): void {
+
+    if (changes['city'] && this.city) {
+
+      this.loadRecords();
+
+      // HU-03
+      this.loading = true;
+
+      this.weatherService.getWeather(this.city.name)
+        .subscribe({
+          next: (data) => {
+            this.weatherDetail = data;
+            this.loading = false;
+          },
+
+          error: () => {
+            this.weatherDetail = null;
+            this.loading = false;
+          }
+        });
     }
   }
 
+  loadRecords(): void {
+
+    this.weatherRecordService.getRecords(this.city.id)
+      .subscribe(records => {
+        this.weatherRecords = records;
+      });
+  }
+
   saveWeather(): void {
-    // TODO HU-04: Agregar aquí el código para guardar un nuevo registro de clima
-    //             Al completar, recarga la lista con weatherRecordService.getRecords(this.city.id).
+
+    if (!this.weatherDetail) return;
+
+    const record = {
+      tempC: this.weatherDetail.temp_c,
+      condition: this.weatherDetail.condition,
+      humidity: this.weatherDetail.humidity
+    };
+
+    this.weatherRecordService
+      .saveRecord(this.city.id, record)
+      .subscribe(() => {
+
+        // recargar tabla
+        this.loadRecords();
+
+      });
   }
 }
